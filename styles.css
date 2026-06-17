@@ -113,6 +113,7 @@ main {
 }
 
 .controls-band,
+.column-band,
 .summary-band,
 .workspace {
   margin: 0 auto 1rem;
@@ -186,8 +187,17 @@ label {
 .destination-row {
   display: grid;
   gap: 0.55rem;
-  grid-template-columns: minmax(100px, 0.65fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(170px, 1.2fr);
   position: relative;
+}
+
+.destination-lat,
+.destination-lon {
+  min-width: 0;
+}
+
+.destination-remove {
+  justify-self: start;
 }
 
 .destination-row::before {
@@ -217,6 +227,22 @@ label {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(4, minmax(120px, 1fr));
+}
+
+.column-band {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
+}
+
+.column-band strong {
+  margin-right: 0.25rem;
 }
 
 .metric {
@@ -249,7 +275,7 @@ label {
   top: 6.5rem;
 }
 
-#mapSvg {
+#map {
   background: #eaf0ed;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -260,17 +286,38 @@ label {
   width: 100%;
 }
 
-#mapSvg rect {
+.leaflet-container {
+  font: inherit;
+}
+
+.fallback-map {
+  overflow: hidden;
+}
+
+.fallback-map svg {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.fallback-map rect {
   fill: #eaf0ed;
 }
 
-.destination-dot circle {
+.fallback-map path {
+  fill: none;
+  opacity: 0.45;
+  stroke: #cfdbd6;
+  stroke-width: 2;
+}
+
+.fallback-destination circle {
   fill: var(--warn);
   stroke: white;
   stroke-width: 3;
 }
 
-.destination-dot text {
+.fallback-destination text {
   fill: var(--ink);
   font-size: 16px;
   font-weight: 800;
@@ -279,11 +326,18 @@ label {
   stroke-width: 4px;
 }
 
-.apartment-dot circle {
+.fallback-apartment circle {
   fill: var(--accent);
-  opacity: 0.82;
+  opacity: 0.85;
   stroke: white;
   stroke-width: 2;
+}
+
+.map-empty {
+  color: var(--muted);
+  display: grid;
+  height: 100%;
+  place-items: center;
 }
 
 .table-panel {
@@ -305,7 +359,8 @@ label {
 
 table {
   border-collapse: collapse;
-  min-width: 1040px;
+  min-width: 980px;
+  table-layout: fixed;
   width: 100%;
 }
 
@@ -329,6 +384,7 @@ th {
 
 td {
   font-size: 0.9rem;
+  overflow-wrap: anywhere;
 }
 
 td small {
@@ -354,7 +410,6 @@ td small {
 .estimates {
   display: grid;
   gap: 0.45rem;
-  min-width: 260px;
 }
 
 .estimate {
@@ -364,7 +419,6 @@ td small {
   display: grid;
   gap: 0.1rem;
   padding: 0.45rem 0.55rem;
-  text-decoration: none;
 }
 
 .estimate span {
@@ -372,18 +426,34 @@ td small {
   font-size: 0.78rem;
 }
 
+.estimate-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+}
+
 .pill {
   background: #eef3f1;
-  border-radius: 999px;
+  border: 1px solid #d5e4df;
+  border-radius: 5px;
   display: inline-block;
   font-size: 0.75rem;
+  line-height: 1.25;
   margin: 0 0.25rem 0.25rem 0;
-  padding: 0.25rem 0.45rem;
+  max-width: 100%;
+  padding: 0.25rem 0.4rem;
+  white-space: normal;
 }
 
 .pill.warn {
   background: #fff1dd;
   color: var(--warn);
+}
+
+.notes-cell {
+  line-height: 1.4;
+  min-width: 180px;
+  white-space: normal;
 }
 
 .empty-state {

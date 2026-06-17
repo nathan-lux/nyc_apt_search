@@ -6,10 +6,10 @@ const DEFAULT_DESTINATIONS = [
     lon: -73.98947,
   },
   {
-    name: "Central Rock Gym Chelsea",
-    address: "Central Rock Gym Chelsea, New York, NY",
-    lat: null,
-    lon: null,
+    name: "CRG / Chelsea anchor",
+    address: "Chelsea, New York, NY",
+    lat: 40.7465,
+    lon: -74.0014,
   },
 ];
 
@@ -26,6 +26,14 @@ const state = {
     amenityWeight: 15,
     sort: "score",
   },
+  columns: {
+    area: true,
+    type: true,
+    status: true,
+    notes: true,
+  },
+  map: null,
+  mapLayers: [],
 };
 
 const els = {
@@ -50,8 +58,9 @@ const els = {
   visibleCount: document.querySelector("#visibleCount"),
   bestRent: document.querySelector("#bestRent"),
   bestCommute: document.querySelector("#bestCommute"),
-  mapSvg: document.querySelector("#mapSvg"),
+  map: document.querySelector("#map"),
   mapHint: document.querySelector("#mapHint"),
+  columnToggles: document.querySelectorAll(".column-toggle"),
 };
 
 function parseCsv(text) {
@@ -143,6 +152,13 @@ function cleanNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function manualCoordinate(value) {
+  const text = String(value).trim();
+  if (!text) return null;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
+}
+
 function cleanType(value) {
   const text = value.trim().toLowerCase();
   if (!text) return "";
@@ -160,6 +176,17 @@ function cleanDishwasher(value) {
   return text;
 }
 
+function coordinatesFromGoogleMaps(url) {
+  const text = String(url || "");
+  const matches = [...text.matchAll(/!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)/g)];
+  if (!matches.length) return null;
+  const [, lon, lat] = matches[matches.length - 1];
+  return {
+    lat: Number(lat),
+    lon: Number(lon),
+  };
+}
+
 function normalizeListings(rows) {
   if (rows.length < 2) return [];
   const headers = rows[0];
@@ -168,6 +195,8 @@ function normalizeListings(rows) {
   const listings = rows.slice(1).map((row, index) => {
     const address = read(row, idx.address);
     const suppliedDistance = cleanNumber(read(row, idx.suppliedDistance));
+    const gmaps = read(row, idx.gmaps);
+    const coordinates = coordinatesFromGoogleMaps(gmaps);
     return {
       id: `apt-${index + 1}`,
       preference: read(row, idx.preference),
@@ -185,12 +214,12 @@ function normalizeListings(rows) {
       neighborhood: read(row, idx.neighborhood).replace(/\s+/g, " ").trim(),
       dishwasher: cleanDishwasher(read(row, idx.dishwasher)),
       sqft: cleanNumber(read(row, idx.sqft)),
-      gmaps: read(row, idx.gmaps),
+      gmaps,
       otherLink: read(row, idx.otherLink),
       amenities: read(row, idx.amenities),
-      lat: null,
-      lon: null,
-      geocodeLabel: "",
+      lat: coordinates?.lat ?? null,
+      lon: coordinates?.lon ?? null,
+      geocodeLabel: coordinates ? "From saved Google Maps link" : "",
       geocodeError: "",
     };
   }).filter((listing) => listing.address || listing.link || listing.notes);
@@ -234,25 +263,25 @@ function haversineMiles(a, b) {
 
 function estimatesFor(listing) {
   const estimates = state.destinations.map((destination, index) => {
-    const rawDistance = haversineMiles(listing, destination);
-    const distance = rawDistance ?? (index === 0 ? listing.suppliedDistance : null);
+    const directDistance = haversineMiles(listing, destination);
+    const distance = directDistance ? directDistance * 1.25 : (index === 0 ? listing.suppliedDistance : null);
     return {
       destination,
       distance,
-      walk: distance ? distance / 3.1 * 60 * 1.2 : null,
-      bike: distance ? distance / 9.5 * 60 * 1.15 : null,
-      mapsUrl: mapsUrl(listing.address, destination.address),
+      bike: distance ? distance / 8.5 * 60 : null,
+      bikeUrl: mapsUrl(listing.address, destination.address, "bicycling"),
+      transitUrl: mapsUrl(listing.address, destination.address, "transit"),
     };
   });
   return estimates;
 }
 
-function mapsUrl(origin, destination) {
+function mapsUrl(origin, destination, travelmode = "transit") {
   const params = new URLSearchParams({
     api: "1",
     origin,
     destination,
-    travelmode: "transit",
+    travelmode,
   });
   return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
@@ -299,11 +328,11 @@ function filteredListings() {
       listing.amenities,
     ].join(" ").toLowerCase();
     const estimates = estimatesFor(listing);
-    const walks = estimates.map((estimate) => estimate.walk).filter(Number.isFinite);
-    const shortestWalk = walks.length ? Math.min(...walks) : null;
+    const bikes = estimates.map((estimate) => estimate.bike).filter(Number.isFinite);
+    const shortestBike = bikes.length ? Math.min(...bikes) : null;
     if (query && !haystack.includes(query)) return false;
     if (maxRent && listing.rent && listing.rent > maxRent) return false;
-    if (maxWalk && shortestWalk && shortestWalk > maxWalk) return false;
+    if (maxWalk && shortestBike && shortestBike > maxWalk) return false;
     if (state.filters.dishwasherOnly && listing.dishwasher !== "yes") return false;
     return true;
   });
@@ -328,10 +357,14 @@ function renderDestinations() {
     const row = node.querySelector(".destination-row");
     const name = node.querySelector(".destination-name");
     const address = node.querySelector(".destination-address");
+    const lat = node.querySelector(".destination-lat");
+    const lon = node.querySelector(".destination-lon");
     const remove = node.querySelector(".destination-remove");
 
     name.value = destination.name;
     address.value = destination.address;
+    lat.value = Number.isFinite(destination.lat) ? destination.lat.toFixed(5) : "";
+    lon.value = Number.isFinite(destination.lon) ? destination.lon.toFixed(5) : "";
     name.addEventListener("input", () => {
       state.destinations[index].name = name.value;
       renderContent();
@@ -341,6 +374,16 @@ function renderDestinations() {
       state.destinations[index].lat = null;
       state.destinations[index].lon = null;
       row.dataset.ready = false;
+      renderContent();
+    });
+    lat.addEventListener("input", () => {
+      state.destinations[index].lat = manualCoordinate(lat.value);
+      row.dataset.ready = Number.isFinite(state.destinations[index].lat) && Number.isFinite(state.destinations[index].lon);
+      renderContent();
+    });
+    lon.addEventListener("input", () => {
+      state.destinations[index].lon = manualCoordinate(lon.value);
+      row.dataset.ready = Number.isFinite(state.destinations[index].lat) && Number.isFinite(state.destinations[index].lon);
       renderContent();
     });
     remove.addEventListener("click", () => {
@@ -369,10 +412,14 @@ function renderTable(listings) {
 
   els.listingRows.innerHTML = listings.map((listing) => {
     const estimates = estimatesFor(listing).map((estimate) => `
-      <a class="estimate" href="${escapeHtml(estimate.mapsUrl)}" target="_blank" rel="noreferrer">
+      <div class="estimate">
         <strong>${escapeHtml(estimate.destination.name || "Destination")}</strong>
-        <span>${miles(estimate.distance)} · walk ${minutes(estimate.walk)} · bike ${minutes(estimate.bike)}</span>
-      </a>
+        <span>${miles(estimate.distance)} · bike ${minutes(estimate.bike)}</span>
+        <span class="estimate-links">
+          <a href="${escapeHtml(estimate.bikeUrl)}" target="_blank" rel="noreferrer">Bike route</a>
+          <a href="${escapeHtml(estimate.transitUrl)}" target="_blank" rel="noreferrer">Transit</a>
+        </span>
+      </div>
     `).join("");
     const status = [listing.preference, listing.contacted, listing.needsResponse, listing.moveIn]
       .filter(Boolean)
@@ -394,14 +441,15 @@ function renderTable(listings) {
           ${listing.geocodeError ? `<small class="error-text">${escapeHtml(listing.geocodeError)}</small>` : ""}
         </td>
         <td>${money(listing.rent)}</td>
-        <td>${escapeHtml(listing.neighborhood || "-")}</td>
-        <td>${escapeHtml(listing.type || "-")}</td>
+        <td data-column="area">${escapeHtml(listing.neighborhood || "-")}</td>
+        <td data-column="type">${escapeHtml(listing.type || "-")}</td>
         <td class="estimates">${estimates}</td>
-        <td>${status || duplicate ? `${status}${duplicate}` : "-"}</td>
-        <td>${escapeHtml([listing.verdict, listing.notes, listing.amenities].filter(Boolean).join(" · ") || "-")}</td>
+        <td data-column="status">${status || duplicate ? `${status}${duplicate}` : "-"}</td>
+        <td class="notes-cell" data-column="notes">${escapeHtml([listing.verdict, listing.notes, listing.amenities].filter(Boolean).join(" · ") || "-")}</td>
       </tr>
     `;
   }).join("");
+  applyColumnVisibility();
 }
 
 function renderSummary(listings) {
@@ -409,23 +457,82 @@ function renderSummary(listings) {
   els.visibleCount.textContent = listings.length.toLocaleString();
   const rents = listings.map((listing) => listing.rent).filter(Number.isFinite);
   els.bestRent.textContent = rents.length ? money(Math.min(...rents)) : "-";
-  const walks = listings.flatMap((listing) => estimatesFor(listing).map((estimate) => estimate.walk))
+  const bikes = listings.flatMap((listing) => estimatesFor(listing).map((estimate) => estimate.bike))
     .filter(Number.isFinite);
-  els.bestCommute.textContent = walks.length ? minutes(Math.min(...walks)) : "-";
+  els.bestCommute.textContent = bikes.length ? minutes(Math.min(...bikes)) : "-";
 }
 
 function renderMap(listings) {
   const plottedListings = listings.filter((listing) => Number.isFinite(listing.lat) && Number.isFinite(listing.lon));
   const plottedDestinations = state.destinations.filter((destination) => Number.isFinite(destination.lat) && Number.isFinite(destination.lon));
-  const points = [...plottedListings, ...plottedDestinations];
-  els.mapSvg.innerHTML = "";
+  const points = [...plottedDestinations, ...plottedListings];
 
-  if (!points.length) {
-    els.mapHint.textContent = "Geocode to plot listings";
+  if (!window.L) {
+    renderFallbackMap(plottedListings, plottedDestinations);
     return;
   }
 
-  els.mapHint.textContent = `${plottedListings.length} apartments plotted`;
+  if (!state.map) {
+    els.map.classList.remove("fallback-map");
+    state.map = L.map(els.map, {
+      scrollWheelZoom: false,
+    }).setView([40.735, -73.99], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(state.map);
+  }
+
+  state.mapLayers.forEach((layer) => layer.remove());
+  state.mapLayers = [];
+  setTimeout(() => state.map.invalidateSize(), 0);
+
+  plottedDestinations.forEach((destination) => {
+    const marker = L.marker([destination.lat, destination.lon], { title: destination.name })
+      .bindPopup(`<strong>${escapeHtml(destination.name)}</strong><br>${escapeHtml(destination.address)}`)
+      .addTo(state.map);
+    state.mapLayers.push(marker);
+  });
+
+  plottedListings.forEach((listing) => {
+    const score = scoreListing(listing);
+    const estimateLines = estimatesFor(listing).map((estimate) => (
+      `<br>${escapeHtml(estimate.destination.name)}: ${miles(estimate.distance)}, bike ${minutes(estimate.bike)}`
+    )).join("");
+    const marker = L.circleMarker([listing.lat, listing.lon], {
+      radius: Math.max(5, Math.min(10, score / 10)),
+      color: "#ffffff",
+      weight: 2,
+      fillColor: "#1f7a6a",
+      fillOpacity: 0.85,
+    }).bindPopup(`
+      <strong>${escapeHtml(listing.address)}</strong><br>
+      Score ${score} · ${money(listing.rent)}<br>
+      ${estimateLines}
+      ${listing.link ? `<a href="${escapeHtml(listing.link)}" target="_blank" rel="noreferrer">Open listing</a>` : ""}
+    `).addTo(state.map);
+    state.mapLayers.push(marker);
+  });
+
+  if (points.length) {
+    state.map.fitBounds(points.map((point) => [point.lat, point.lon]), { padding: [28, 28], maxZoom: 14 });
+  }
+  els.mapHint.textContent = plottedListings.length
+    ? `${plottedListings.length} apartments plotted`
+    : "Known destinations shown. Geocode listings to add apartments.";
+}
+
+function renderFallbackMap(plottedListings, plottedDestinations) {
+  const points = [...plottedDestinations, ...plottedListings];
+  els.map.innerHTML = "";
+  els.map.classList.add("fallback-map");
+
+  if (!points.length) {
+    els.mapHint.textContent = "Geocode to plot listings";
+    els.map.innerHTML = `<div class="map-empty">No mapped points yet</div>`;
+    return;
+  }
+
   const lats = points.map((point) => point.lat);
   const lons = points.map((point) => point.lon);
   const bounds = {
@@ -436,35 +543,47 @@ function renderMap(listings) {
   };
   const width = 720;
   const height = 520;
-  els.mapSvg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-
   const project = (point) => ({
-    x: ((point.lon - bounds.minLon) / (bounds.maxLon - bounds.minLon)) * (width - 60) + 30,
-    y: height - (((point.lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * (height - 60) + 30),
+    x: ((point.lon - bounds.minLon) / (bounds.maxLon - bounds.minLon)) * (width - 70) + 35,
+    y: height - (((point.lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * (height - 70) + 35),
   });
 
-  els.mapSvg.insertAdjacentHTML("beforeend", `<rect x="0" y="0" width="${width}" height="${height}" rx="8" />`);
-  plottedDestinations.forEach((destination) => {
+  const destinationDots = plottedDestinations.map((destination) => {
     const { x, y } = project(destination);
-    els.mapSvg.insertAdjacentHTML("beforeend", `
-      <g class="destination-dot" transform="translate(${x} ${y})">
+    return `
+      <g class="fallback-destination" transform="translate(${x} ${y})">
         <circle r="9"></circle>
         <text x="13" y="4">${escapeHtml(destination.name)}</text>
       </g>
-    `);
-  });
-  plottedListings.forEach((listing) => {
+    `;
+  }).join("");
+  const listingDots = plottedListings.map((listing) => {
     const { x, y } = project(listing);
     const score = scoreListing(listing);
-    els.mapSvg.insertAdjacentHTML("beforeend", `
+    const estimateTitle = estimatesFor(listing)
+      .map((estimate) => `${estimate.destination.name}: ${miles(estimate.distance)}, bike ${minutes(estimate.bike)}`)
+      .join(" | ");
+    return `
       <a href="${escapeHtml(listing.link || mapsUrl(listing.address, state.destinations[0]?.address || ""))}" target="_blank" rel="noreferrer">
-        <g class="apartment-dot" transform="translate(${x} ${y})">
+        <g class="fallback-apartment" transform="translate(${x} ${y})">
           <circle r="${Math.max(5, Math.min(10, score / 10))}"></circle>
-          <title>${escapeHtml(listing.address)} · score ${score}</title>
+          <title>${escapeHtml(listing.address)} · score ${score} · ${escapeHtml(estimateTitle)}</title>
         </g>
       </a>
-    `);
-  });
+    `;
+  }).join("");
+
+  els.map.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Approximate apartment map">
+      <rect x="0" y="0" width="${width}" height="${height}" rx="8"></rect>
+      <path d="M120 0V520M240 0V520M360 0V520M480 0V520M600 0V520M0 130H720M0 260H720M0 390H720"></path>
+      ${destinationDots}
+      ${listingDots}
+    </svg>
+  `;
+  els.mapHint.textContent = plottedListings.length
+    ? `${plottedListings.length} apartments plotted`
+    : "Known destinations shown. Geocode listings to add apartments.";
 }
 
 function renderContent() {
@@ -517,8 +636,8 @@ function exportCsv() {
     "longitude",
     ...state.destinations.flatMap((destination) => [
       `${destination.name} distance mi`,
-      `${destination.name} walk min`,
       `${destination.name} bike min`,
+      `${destination.name} transit link`,
     ]),
   ];
 
@@ -545,8 +664,8 @@ function exportCsv() {
       listing.lon,
       ...estimates.flatMap((estimate) => [
         estimate.distance?.toFixed(2) ?? "",
-        estimate.walk ? Math.round(estimate.walk) : "",
         estimate.bike ? Math.round(estimate.bike) : "",
+        estimate.transitUrl,
       ]),
     ];
   });
@@ -676,6 +795,20 @@ els.dishwasherOnly.addEventListener("change", () => {
   state.filters.dishwasherOnly = els.dishwasherOnly.checked;
   render();
 });
+els.columnToggles.forEach((toggle) => {
+  toggle.addEventListener("change", () => {
+    state.columns[toggle.dataset.column] = toggle.checked;
+    applyColumnVisibility();
+  });
+});
+
+function applyColumnVisibility() {
+  Object.entries(state.columns).forEach(([column, visible]) => {
+    document.querySelectorAll(`[data-column="${column}"]`).forEach((cell) => {
+      cell.hidden = !visible;
+    });
+  });
+}
 
 function syncInputs() {
   els.searchInput.value = state.filters.search;

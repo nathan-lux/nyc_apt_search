@@ -4,6 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>NYC Apartment Compass</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIINfQPK9V1p3WbM15xy4LIQz3i7Bf5IEw="
+      crossorigin=""
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -45,7 +51,7 @@
             <input id="maxRentInput" type="number" min="0" step="50" placeholder="Any" />
           </label>
           <label>
-            Max approximate walk to any destination
+            Max bike time to any destination
             <input id="maxWalkInput" type="number" min="0" step="5" placeholder="Any" />
           </label>
           <label class="checkbox-line">
@@ -90,8 +96,28 @@
         </div>
         <div class="metric">
           <span id="bestCommute">-</span>
-          <small>Best walk estimate</small>
+          <small>Best bike estimate</small>
         </div>
+      </section>
+
+      <section class="column-band" aria-label="Listing column controls">
+        <strong>Columns</strong>
+        <label class="checkbox-line">
+          <input class="column-toggle" type="checkbox" data-column="area" checked />
+          Area
+        </label>
+        <label class="checkbox-line">
+          <input class="column-toggle" type="checkbox" data-column="type" checked />
+          Type
+        </label>
+        <label class="checkbox-line">
+          <input class="column-toggle" type="checkbox" data-column="status" checked />
+          Status
+        </label>
+        <label class="checkbox-line">
+          <input class="column-toggle" type="checkbox" data-column="notes" checked />
+          Notes
+        </label>
       </section>
 
       <section class="workspace">
@@ -100,7 +126,7 @@
             <h2>Map</h2>
             <span id="mapHint">Geocode to plot listings</span>
           </div>
-          <svg id="mapSvg" role="img" aria-label="Apartment map"></svg>
+          <div id="map" role="img" aria-label="Apartment map"></div>
         </aside>
 
         <section class="table-panel">
@@ -123,11 +149,11 @@
                   <th>Score</th>
                   <th>Apartment</th>
                   <th>Rent</th>
-                  <th>Area</th>
-                  <th>Type</th>
+                  <th data-column="area">Area</th>
+                  <th data-column="type">Type</th>
                   <th>Destination estimates</th>
-                  <th>Status</th>
-                  <th>Notes</th>
+                  <th data-column="status">Status</th>
+                  <th data-column="notes">Notes</th>
                 </tr>
               </thead>
               <tbody id="listingRows">
@@ -147,10 +173,17 @@
       <div class="destination-row">
         <input class="destination-name" aria-label="Destination name" />
         <input class="destination-address" aria-label="Destination address" />
+        <input class="destination-lat" aria-label="Destination latitude" placeholder="Lat" />
+        <input class="destination-lon" aria-label="Destination longitude" placeholder="Lon" />
         <button class="destination-remove" type="button" aria-label="Remove destination">Remove</button>
       </div>
     </template>
 
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
     <script src="app.js"></script>
   </body>
 </html>
