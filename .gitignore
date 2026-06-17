@@ -1,0 +1,5 @@
+data/
+exports/
+*.local.csv
+apartments-cleaned.csv
+.DS_Store

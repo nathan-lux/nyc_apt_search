@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NYC Apartment Compass</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">StreetEasy sheet helper</p>
+        <h1>NYC Apartment Compass</h1>
+      </div>
+      <div class="header-actions">
+        <label class="file-button">
+          <input id="csvInput" type="file" accept=".csv,text/csv" />
+          Upload CSV
+        </label>
+        <button id="exportButton" type="button" disabled>Export clean CSV</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="controls-band">
+        <div class="control-group destinations">
+          <div class="section-heading">
+            <h2>Destinations</h2>
+            <button id="addDestination" type="button">Add</button>
+          </div>
+          <div id="destinationList" class="destination-list"></div>
+        </div>
+
+        <div class="control-group scoring">
+          <div class="section-heading">
+            <h2>Filters</h2>
+            <button id="resetFilters" type="button">Reset</button>
+          </div>
+          <label>
+            Search
+            <input id="searchInput" type="search" placeholder="Address, neighborhood, notes" />
+          </label>
+          <label>
+            Max rent
+            <input id="maxRentInput" type="number" min="0" step="50" placeholder="Any" />
+          </label>
+          <label>
+            Max approximate walk to any destination
+            <input id="maxWalkInput" type="number" min="0" step="5" placeholder="Any" />
+          </label>
+          <label class="checkbox-line">
+            <input id="dishwasherOnly" type="checkbox" />
+            Dishwasher preferred
+          </label>
+        </div>
+
+        <div class="control-group weights">
+          <div class="section-heading">
+            <h2>Weights</h2>
+          </div>
+          <label>
+            Commute importance
+            <input id="commuteWeight" type="range" min="0" max="100" value="55" />
+          </label>
+          <label>
+            Rent importance
+            <input id="rentWeight" type="range" min="0" max="100" value="30" />
+          </label>
+          <label>
+            Amenities importance
+            <input id="amenityWeight" type="range" min="0" max="100" value="15" />
+          </label>
+          <button id="geocodeButton" type="button" disabled>Geocode addresses</button>
+          <p id="geocodeStatus" class="status-text">Upload a CSV to begin.</p>
+        </div>
+      </section>
+
+      <section class="summary-band">
+        <div class="metric">
+          <span id="totalCount">0</span>
+          <small>Listings</small>
+        </div>
+        <div class="metric">
+          <span id="visibleCount">0</span>
+          <small>Visible</small>
+        </div>
+        <div class="metric">
+          <span id="bestRent">-</span>
+          <small>Lowest rent</small>
+        </div>
+        <div class="metric">
+          <span id="bestCommute">-</span>
+          <small>Best walk estimate</small>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <aside class="map-panel">
+          <div class="section-heading">
+            <h2>Map</h2>
+            <span id="mapHint">Geocode to plot listings</span>
+          </div>
+          <svg id="mapSvg" role="img" aria-label="Apartment map"></svg>
+        </aside>
+
+        <section class="table-panel">
+          <div class="table-toolbar">
+            <div>
+              <h2>Listings</h2>
+              <p>Sorted by score. Distances are rough estimates unless exported from a maps service.</p>
+            </div>
+            <select id="sortSelect" aria-label="Sort listings">
+              <option value="score">Best score</option>
+              <option value="rent">Lowest rent</option>
+              <option value="distance">Shortest destination distance</option>
+              <option value="neighborhood">Neighborhood</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Score</th>
+                  <th>Apartment</th>
+                  <th>Rent</th>
+                  <th>Area</th>
+                  <th>Type</th>
+                  <th>Destination estimates</th>
+                  <th>Status</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="listingRows">
+                <tr>
+                  <td colspan="8" class="empty-state">
+                    Upload the apartment CSV to clean it up and start comparing listings.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <template id="destinationTemplate">
+      <div class="destination-row">
+        <input class="destination-name" aria-label="Destination name" />
+        <input class="destination-address" aria-label="Destination address" />
+        <button class="destination-remove" type="button" aria-label="Remove destination">Remove</button>
+      </div>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
